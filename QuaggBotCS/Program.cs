@@ -27,6 +27,7 @@ namespace QuaggBotCS
             DataHandler.URepo = new UserRepo(connString);
             DataHandler.DiscordToken = jsonObject["disKey"].ToString();
             DataHandler.MWKey = jsonObject["mwKey"].ToString();
+            DataHandler.OpenWeather = jsonObject["oWeather"].ToString();
             DataHandler.Users = DataHandler.URepo.GetUsers();
             
             discord = new DiscordClient(new DiscordConfiguration
@@ -53,5 +54,6 @@ namespace QuaggBotCS
         public static string MWKey { get; set; }
         public static List<User> Users { get; set; }
         public static UserRepo URepo { get; set; }
+        public static string OpenWeather { get; set; }
     }
 }

@@ -3,11 +3,13 @@ using DSharpPlus.CommandsNext.Attributes;
 using DSharpPlus.Entities;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Net;
+using System.Net.Http;
 using System.Threading.Tasks;
 using System.Xml;
 
@@ -80,6 +82,17 @@ namespace QuaggBotCS
             await ctx.RespondAsync(output);
         }
 
+        [Command("Weather"), Description("Get your local weather just from a zip code (and country code if you're outside the US)")]
+        public async Task CurrentWeather(CommandContext ctx, [Description("Your Zip Code")] int Zip, [Description("Your Country Code (UK, AU, NZ, etc)")] string Country = "US")
+        {
+            await CommandHandler.CurrentWeather(ctx, Zip, Country);
+        }
+
+        [Command("Wikipedia"), Aliases("Wiki"), Description("Links you to the Wikipedia page for whatever you search")]
+        public async Task Wikipedia(CommandContext ctx, [Description("Article to search for")] string Article)
+        {
+            await ctx.RespondAsync($"http://en.wikipedia.org/wiki/{Article}");
+        }
         [Group("Memes", CanInvokeWithoutSubcommand = true), Description("Fresh memes here! Come getcha memes!")]
         public class Memes
         {
@@ -87,6 +100,13 @@ namespace QuaggBotCS
             {
                 Console.WriteLine($"{ctx.Command.Name} command recieved from user {ctx.User.Username}#{ctx.User.Discriminator} in server {ctx.Guild.Name}");
                 await CommandHandler.MemeGenerator(ctx, input);
+            }
+
+            [Command("Chuck"), Description("Chuck Norris facts, 100% true every time")]
+            public async Task Chuck(CommandContext ctx)
+            {
+                await ctx.TriggerTypingAsync();
+                await ctx.RespondAsync(CommandHandler.ChuckNorris(ctx));
             }
         } 
     }
@@ -111,8 +131,134 @@ namespace QuaggBotCS
         public static Meme FromJson(string json) => JsonConvert.DeserializeObject<Meme>(json, Converter.Settings);
     }
 
+    public partial class Weather
+    {
+        [JsonProperty("coord")]
+        public Coord Coord { get; set; }
+
+        [JsonProperty("weather")]
+        public List<WeatherElement> WeatherWeather { get; set; }
+
+        [JsonProperty("base")]
+        public string Base { get; set; }
+
+        [JsonProperty("main")]
+        public MainWeather Main { get; set; }
+
+        [JsonProperty("visibility")]
+        public long Visibility { get; set; }
+
+        [JsonProperty("wind")]
+        public Wind Wind { get; set; }
+
+        [JsonProperty("clouds")]
+        public Clouds Clouds { get; set; }
+
+        [JsonProperty("dt")]
+        public long Dt { get; set; }
+
+        [JsonProperty("sys")]
+        public Sys Sys { get; set; }
+
+        [JsonProperty("id")]
+        public long Id { get; set; }
+
+        [JsonProperty("name")]
+        public string Name { get; set; }
+
+        [JsonProperty("cod")]
+        public long Cod { get; set; }
+    }
+
+    public partial class Clouds
+    {
+        [JsonProperty("all")]
+        public long All { get; set; }
+    }
+
+    public partial class Coord
+    {
+        [JsonProperty("lon")]
+        public double Lon { get; set; }
+
+        [JsonProperty("lat")]
+        public double Lat { get; set; }
+    }
+
+    public partial class MainWeather
+    {
+        [JsonProperty("temp")]
+        public double Temp { get; set; }
+
+        [JsonProperty("pressure")]
+        public long Pressure { get; set; }
+
+        [JsonProperty("humidity")]
+        public long Humidity { get; set; }
+
+        [JsonProperty("temp_min")]
+        public double TempMin { get; set; }
+
+        [JsonProperty("temp_max")]
+        public double TempMax { get; set; }
+    }
+
+    public partial class Sys
+    {
+        [JsonProperty("type")]
+        public long Type { get; set; }
+
+        [JsonProperty("id")]
+        public long Id { get; set; }
+
+        [JsonProperty("message")]
+        public double Message { get; set; }
+
+        [JsonProperty("country")]
+        public string Country { get; set; }
+
+        [JsonProperty("sunrise")]
+        public long Sunrise { get; set; }
+
+        [JsonProperty("sunset")]
+        public long Sunset { get; set; }
+    }
+
+    public partial class WeatherElement
+    {
+        [JsonProperty("id")]
+        public long Id { get; set; }
+
+        [JsonProperty("main")]
+        public string Main { get; set; }
+
+        [JsonProperty("description")]
+        public string Description { get; set; }
+
+        [JsonProperty("icon")]
+        public string Icon { get; set; }
+    }
+
+    public partial class Wind
+    {
+        [JsonProperty("speed")]
+        public double Speed { get; set; }
+
+        [JsonProperty("deg")]
+        public long Deg { get; set; }
+
+        [JsonProperty("gust")]
+        public double Gust { get; set; }
+    }
+
+    public partial class Weather
+    {
+        public static Weather FromJson(string json) => JsonConvert.DeserializeObject<Weather>(json, Converter.Settings);
+    }
+
     public static class Serialize
     {
+        public static string ToJson(this Weather self) => JsonConvert.SerializeObject(self, Converter.Settings);
         public static string ToJson(this Meme self) => JsonConvert.SerializeObject(self, Converter.Settings);
     }
 
@@ -235,6 +381,17 @@ namespace QuaggBotCS
             await ctx.RespondAsync(embed: embed);
         }
 
+        public static string ChuckNorris(CommandContext ctx)
+        {
+            string url = "https://api.chucknorris.io/jokes/random";
+            HttpClient client = new HttpClient();
+            Task<string> response = client.GetStringAsync(url);
+            JObject jsonObject = JObject.Parse(response.Result);
+            JToken jsonValue = jsonObject["value"];
+            //return JObject.Parse(client.GetStringAsync(url).Result)["value"].ToString();
+            return jsonValue.ToString();
+        }
+
         public static string Roll(string input)
         {
             //Define vars
@@ -291,6 +448,17 @@ namespace QuaggBotCS
                 throw;
             }
             return output;
+        }
+
+        public static async Task CurrentWeather(CommandContext ctx, int Zip, string Country)
+        {
+            await ctx.TriggerTypingAsync();
+            string url = $"https://api.openweathermap.org/data/2.5/weather?zip={Zip},{Country}&appid={DataHandler.OpenWeather}";
+            HttpClient client = new HttpClient();
+            Task<string> response = client.GetStringAsync(url);
+            string jsonData = response.Result;
+            Weather weather = Weather.FromJson(jsonData);
+            await ctx.RespondAsync($"Temperature: {weather.Main.Temp-273.15}ºC\nWeather: {weather.WeatherWeather[0].Description}\nHumidity: {weather.Main.Humidity}%");
         }
     }
 }
